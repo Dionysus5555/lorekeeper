@@ -45,61 +45,116 @@ class ProviderManager:
             user_agent=user_agent,
         )
 
+    def _select_provider(self, query: str) -> str:
+        """Select the best provider for a query.
+
+        This is deliberately simple for now. As providers are added,
+        this becomes Lorekeeper's routing brain.
+        """
+        text = query.lower().strip()
+
+        # Future provider hooks.
+        if any(term in text for term in ("home assistant", "hass", "ha docs")):
+            return "home_assistant_docs"
+
+        if any(term in text for term in ("chord", "chords", "lyrics", "song sheet")):
+            return "chords"
+
+        if any(term in text for term in ("recipe", "recipes", "cook", "cooking")):
+            return "recipes"
+
+        # Default fallback.
+        return "wikipedia"
+
+    def _unsupported_lookup_response(
+        self,
+        provider: str,
+        query: str,
+    ) -> dict[str, Any]:
+        """Return a standard unsupported-provider lookup response."""
+        return {
+            "found": False,
+            "provider": provider,
+            "query": query,
+            "title": None,
+            "summary": None,
+            "speech": None,
+            "context": None,
+            "url": None,
+            "image": None,
+            "error": "unsupported_provider",
+        }
+
+    def _unsupported_search_response(
+        self,
+        provider: str,
+        query: str,
+    ) -> dict[str, Any]:
+        """Return a standard unsupported-provider search response."""
+        return {
+            "found": False,
+            "provider": provider,
+            "query": query,
+            "results": [],
+            "error": "unsupported_provider",
+        }
+
+    def _unsupported_summary_response(
+        self,
+        provider: str,
+        title: str,
+    ) -> dict[str, Any]:
+        """Return a standard unsupported-provider summary response."""
+        return {
+            "found": False,
+            "provider": provider,
+            "title": title,
+            "summary": None,
+            "speech": None,
+            "context": None,
+            "url": None,
+            "image": None,
+            "error": "unsupported_provider",
+        }
+
     async def search(
         self,
         query: str,
-        provider: str = "wikipedia",
+        provider: str | None = None,
     ) -> dict[str, Any]:
         """Search a knowledge provider."""
-        if provider != "wikipedia":
-            return {
-                "found": False,
-                "provider": provider,
-                "query": query,
-                "results": [],
-                "error": "unsupported_provider",
-            }
+        selected_provider = provider or self._select_provider(query)
 
-        wikipedia = self._get_wikipedia_provider()
-        return await wikipedia.search(query)
+        if selected_provider == "wikipedia":
+            wikipedia = self._get_wikipedia_provider()
+            return await wikipedia.search(query)
+
+        return self._unsupported_search_response(selected_provider, query)
 
     async def summary(
         self,
         title: str,
-        provider: str = "wikipedia",
+        provider: str | None = None,
     ) -> dict[str, Any]:
         """Get a summary from a knowledge provider."""
-        if provider != "wikipedia":
-            return {
-                "found": False,
-                "provider": provider,
-                "title": title,
-                "summary": None,
-                "url": None,
-                "image": None,
-                "error": "unsupported_provider",
-            }
+        selected_provider = provider or self._select_provider(title)
 
-        wikipedia = self._get_wikipedia_provider()
-        return await wikipedia.summary(title)
+        if selected_provider == "wikipedia":
+            wikipedia = self._get_wikipedia_provider()
+            return await wikipedia.summary(title)
+
+        return self._unsupported_summary_response(selected_provider, title)
 
     async def lookup(
         self,
         query: str,
-        provider: str = "wikipedia",
+        provider: str | None = None,
     ) -> dict[str, Any]:
-        """Look up a topic using a knowledge provider."""
-        if provider != "wikipedia":
-            return {
-                "found": False,
-                "provider": provider,
-                "query": query,
-                "title": None,
-                "summary": None,
-                "url": None,
-                "image": None,
-                "error": "unsupported_provider",
-            }
+        """Look up a topic using the best available knowledge provider."""
+        selected_provider = provider or self._select_provider(query)
 
-        wikipedia = self._get_wikipedia_provider()
-        return await wikipedia.lookup(query)
+        if selected_provider == "wikipedia":
+            wikipedia = self._get_wikipedia_provider()
+            return await wikipedia.lookup(query)
+
+        return self._unsupported_lookup_response(selected_provider, query)
