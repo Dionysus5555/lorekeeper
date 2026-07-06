@@ -26,6 +26,26 @@ class WikipediaProvider:
     def api_base(self) -> str:
         return f"https://{self.language}.wikipedia.org"
 
+    def _make_speech(
+        self,
+        title: str,
+        summary: str | None,
+        description: str | None = None,
+    ) -> str | None:
+        """Create a short Gaia-friendly speech response."""
+        if not summary:
+            return None
+
+        first_sentence = summary.split(". ")[0].strip()
+
+        if first_sentence and not first_sentence.endswith("."):
+            first_sentence += "."
+
+        if len(first_sentence) > 240:
+            first_sentence = first_sentence[:237].rsplit(" ", 1)[0] + "..."
+
+        return first_sentence
+
     async def search(self, query: str, limit: int = 5) -> dict[str, Any]:
         """Search Wikipedia for matching page titles."""
         url = f"{self.api_base}/w/api.php"
@@ -77,6 +97,8 @@ class WikipediaProvider:
                     "provider": "wikipedia",
                     "title": title,
                     "summary": None,
+                    "speech": None,
+                    "context": None,
                     "url": None,
                     "image": None,
                     "error": "not_found",
@@ -84,11 +106,7 @@ class WikipediaProvider:
 
             raise
 
-        page_url = (
-            data.get("content_urls", {})
-            .get("desktop", {})
-            .get("page")
-        )
+        page_url = data.get("content_urls", {}).get("desktop", {}).get("page")
 
         image = None
         if data.get("thumbnail"):
@@ -96,12 +114,23 @@ class WikipediaProvider:
         elif data.get("originalimage"):
             image = data["originalimage"].get("source")
 
+        page_title = data.get("title", title)
+        summary_text = data.get("extract")
+        description = data.get("description")
+        speech = self._make_speech(page_title, summary_text, description)
+
+        context = None
+        if summary_text:
+            context = f"Source: Wikipedia. {page_title}: {summary_text}"
+
         return {
-            "found": bool(data.get("extract")),
+            "found": bool(summary_text),
             "provider": "wikipedia",
-            "title": data.get("title", title),
-            "summary": data.get("extract"),
-            "description": data.get("description"),
+            "title": page_title,
+            "summary": summary_text,
+            "speech": speech,
+            "context": context,
+            "description": description,
             "url": page_url,
             "image": image,
         }
@@ -117,6 +146,8 @@ class WikipediaProvider:
                 "query": query,
                 "title": None,
                 "summary": None,
+                "speech": None,
+                "context": None,
                 "url": None,
                 "image": None,
                 "error": "no_results",
