@@ -12,6 +12,8 @@ from ..const import (
     DEFAULT_USER_AGENT,
     DOMAIN,
 )
+from .github import GitHubProvider
+from .home_assistant_docs import HomeAssistantDocsProvider
 from .wikipedia import WikipediaProvider
 
 
@@ -45,6 +47,14 @@ class ProviderManager:
                 language=language,
                 user_agent=user_agent,
             ),
+            "home_assistant_docs": HomeAssistantDocsProvider(
+                session=session,
+                user_agent=user_agent,
+            ),
+            "github": GitHubProvider(
+                session=session,
+                user_agent=user_agent,
+            ),
         }
 
     def _select_provider(self, query: str) -> str:
@@ -54,7 +64,7 @@ class ProviderManager:
         if any(term in text for term in ("home assistant", "hass", "ha docs")):
             return "home_assistant_docs"
 
-        if any(term in text for term in ("github", "repo", "repository", "release notes", "issues")):
+        if any(term in text for term in ("github", "repo", "repository", "release notes", "issues", "pull request", "readme")):
             return "github"
 
         if any(term in text for term in ("chord", "chords", "lyrics", "song sheet")):
