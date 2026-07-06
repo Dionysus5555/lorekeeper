@@ -20,6 +20,7 @@ class ProviderManager:
 
     def __init__(self, hass: HomeAssistant) -> None:
         self.hass = hass
+        self.providers = self._create_providers()
 
     def _get_config(self) -> dict[str, Any]:
         """Get the first Lorekeeper config entry data."""
@@ -30,32 +31,31 @@ class ProviderManager:
 
         return next(iter(entries.values()))
 
-    def _get_wikipedia_provider(self) -> WikipediaProvider:
-        """Create a Wikipedia provider."""
+    def _create_providers(self) -> dict[str, Any]:
+        """Create available providers."""
         config = self._get_config()
 
         language = config.get(CONF_LANGUAGE, DEFAULT_LANGUAGE)
         user_agent = config.get(CONF_USER_AGENT, DEFAULT_USER_AGENT)
-
         session = async_get_clientsession(self.hass)
 
-        return WikipediaProvider(
-            session=session,
-            language=language,
-            user_agent=user_agent,
-        )
+        return {
+            "wikipedia": WikipediaProvider(
+                session=session,
+                language=language,
+                user_agent=user_agent,
+            ),
+        }
 
     def _select_provider(self, query: str) -> str:
-        """Select the best provider for a query.
-
-        This is deliberately simple for now. As providers are added,
-        this becomes Lorekeeper's routing brain.
-        """
+        """Select the best provider for a query."""
         text = query.lower().strip()
 
-        # Future provider hooks.
         if any(term in text for term in ("home assistant", "hass", "ha docs")):
             return "home_assistant_docs"
+
+        if any(term in text for term in ("github", "repo", "repository", "release notes", "issues")):
+            return "github"
 
         if any(term in text for term in ("chord", "chords", "lyrics", "song sheet")):
             return "chords"
@@ -63,15 +63,17 @@ class ProviderManager:
         if any(term in text for term in ("recipe", "recipes", "cook", "cooking")):
             return "recipes"
 
-        # Default fallback.
         return "wikipedia"
+
+    def _get_provider(self, provider: str) -> Any | None:
+        """Get a provider by name."""
+        return self.providers.get(provider)
 
     def _unsupported_lookup_response(
         self,
         provider: str,
         query: str,
     ) -> dict[str, Any]:
-        """Return a standard unsupported-provider lookup response."""
         return {
             "found": False,
             "provider": provider,
@@ -90,7 +92,6 @@ class ProviderManager:
         provider: str,
         query: str,
     ) -> dict[str, Any]:
-        """Return a standard unsupported-provider search response."""
         return {
             "found": False,
             "provider": provider,
@@ -104,7 +105,6 @@ class ProviderManager:
         provider: str,
         title: str,
     ) -> dict[str, Any]:
-        """Return a standard unsupported-provider summary response."""
         return {
             "found": False,
             "provider": provider,
@@ -124,12 +124,12 @@ class ProviderManager:
     ) -> dict[str, Any]:
         """Search a knowledge provider."""
         selected_provider = provider or self._select_provider(query)
+        selected = self._get_provider(selected_provider)
 
-        if selected_provider == "wikipedia":
-            wikipedia = self._get_wikipedia_provider()
-            return await wikipedia.search(query)
+        if selected is None:
+            return self._unsupported_search_response(selected_provider, query)
 
-        return self._unsupported_search_response(selected_provider, query)
+        return await selected.search(query)
 
     async def summary(
         self,
@@ -138,23 +138,23 @@ class ProviderManager:
     ) -> dict[str, Any]:
         """Get a summary from a knowledge provider."""
         selected_provider = provider or self._select_provider(title)
+        selected = self._get_provider(selected_provider)
 
-        if selected_provider == "wikipedia":
-            wikipedia = self._get_wikipedia_provider()
-            return await wikipedia.summary(title)
+        if selected is None:
+            return self._unsupported_summary_response(selected_provider, title)
 
-        return self._unsupported_summary_response(selected_provider, title)
+        return await selected.summary(title)
 
     async def lookup(
         self,
         query: str,
         provider: str | None = None,
     ) -> dict[str, Any]:
-        """Look up a topic using the best available knowledge provider."""
+        """Look up a topic using the best available provider."""
         selected_provider = provider or self._select_provider(query)
+        selected = self._get_provider(selected_provider)
 
-        if selected_provider == "wikipedia":
-            wikipedia = self._get_wikipedia_provider()
-            return await wikipedia.lookup(query)
+        if selected is None:
+            return self._unsupported_lookup_response(selected_provider, query)
 
-        return self._unsupported_lookup_response(selected_provider, query)
+        return await selected.lookup(query)
