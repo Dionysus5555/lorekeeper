@@ -1,1 +1,11 @@
-
+{
+  "domain": "lorekeeper",
+  "name": "Lorekeeper",
+  "codeowners": ["@Dionysus5555"],
+  "config_flow": true,
+  "documentation": "https://github.com/Dionysus5555/lorekeeper",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/Dionysus5555/lorekeeper/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
