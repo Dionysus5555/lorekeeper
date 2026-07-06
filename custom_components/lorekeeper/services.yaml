@@ -1,1 +1,32 @@
+lookup:
+  name: Lookup
+  description: Look up a topic using Lorekeeper.
+  fields:
+    query:
+      name: Query
+      description: The topic to look up.
+      required: true
+      selector:
+        text:
 
+search:
+  name: Search
+  description: Search for matching knowledge entries.
+  fields:
+    query:
+      name: Query
+      description: The topic to search for.
+      required: true
+      selector:
+        text:
+
+summary:
+  name: Summary
+  description: Get a summary for an exact page title.
+  fields:
+    title:
+      name: Title
+      description: The exact page title to summarise.
+      required: true
+      selector:
+        text:
